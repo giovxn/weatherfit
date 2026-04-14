@@ -1,0 +1,73 @@
+# WeatherFit
+A rule-based expert system that recommends outfits from your personal wardrobe based on real-time weather and activity context.
+
+---
+
+## Why this project
+WeatherFit is not a temperature-only outfit app. It combines an expert system and ML attribute prediction to recommend what to wear based on full weather conditions and daily context (for example rain, wind, and activity), which is more practical than relying on temperature alone.
+
+## Live Demo
+Video walkthrough: [https://youtu.be/IDxKMkDW8mA](https://youtu.be/IDxKMkDW8mA)
+
+<img src="docs/screenshots/home.png" alt="WeatherFit home screen" width="400" />
+<img src="docs/screenshots/add-item-ml.png" alt="Add item modal with ML autofill" width="400" />
+<img src="docs/screenshots/recommendation.png" alt="Outfit recommendation output" width="400" />
+
+## Stack
+React, Vite, IndexedDB, OpenWeatherMap API
+
+## Performance and limitations
+The ML auto-fill model performs strongly on category (98.77%) and formality (89.83%), while warmth remains the hardest attribute (73.69%) due to label ambiguity and seasonal overlap. Simplifying category labels from 27 to 5 groups improved category accuracy (+2.92%), but real-world uploads can still be harder than validation images because training data is mostly clean product photography.
+
+## Running
+Requires [Node.js](https://nodejs.org)
+
+Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+
+```bash
+npm install
+npm run dev
+```
+Open `http://localhost:3000` — click **Preload Closet** on first launch.
+
+## AI Auto-Fill Integration
+You can auto-fill clothing attributes when uploading an item image.
+
+### 1) Start frontend
+```bash
+npm install
+npm run dev
+```
+
+### 2) Start ML service (FastAPI)
+From `ml-service/`:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Copy your model + labels:
+- Place your checkpoint as `ml-service/best_model.pth` (or set `ML_MODEL_PATH`)
+- Copy `ml-service/label_maps.example.json` to `ml-service/label_maps.json` if needed
+
+Run:
+```bash
+uvicorn app:app --reload --port 8000
+```
+
+When running, image upload in the add-item modal calls `POST /api/ml/predict` and pre-fills:
+- `category`
+- `warmthRating`
+- `formalities`
+
+If the model is unavailable, the modal falls back to manual entry.
+
+## Structure
+- `src/utils/expertSystem.js` — all rule logic
+- `src/utils/preloadData.js` — sample wardrobe
+- `src/components/` — UI components
+- `public/closet/` — wardrobe images

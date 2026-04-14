@@ -1,0 +1,37 @@
+{
+  "name": "smart-outfit-advisor",
+  "private": true,
+  "version": "1.0.0",
+  "main": "electron.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "vite --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.8",
+    "lucide-react": "^0.577.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
+    "vite": "^5.4.2"
+  },
+  "build": {
+    "appId": "com.gio.outfitselector",
+    "productName": "WeatherFit",
+    "files": [
+      "dist/**/*",
+      "electron.js"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  }
+}
