@@ -31,12 +31,9 @@ cp .env.example .env
 npm install
 npm run dev
 ```
-Open `http://localhost:3000` — click Preload Closet on first launch.
+Open `http://localhost:3000` — click Preload Closet (or upload your own) on first launch.
 
-```bash
-npm install
-npm run dev
-```
+*The trained model weights are not included in this repository, primarily to maintain academic integrity. The full ML service implementation and integration flow are provided, and the project can be run by supplying your own trained checkpoint (best_model.pth) in ml-service (or via ML_MODEL_PATH).*
 
 ## Structure
 - `src/utils/expertSystem.js` — all rule logic
