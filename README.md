@@ -31,40 +31,12 @@ cp .env.example .env
 npm install
 npm run dev
 ```
-Open `http://localhost:3000` — click **Preload Closet** on first launch.
+Open `http://localhost:3000` — click Preload Closet on first launch.
 
-## AI Auto-Fill Integration
-You can auto-fill clothing attributes when uploading an item image.
-
-### 1) Start frontend
 ```bash
 npm install
 npm run dev
 ```
-
-### 2) Start ML service (FastAPI)
-From `ml-service/`:
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Copy your model + labels:
-- Place your checkpoint as `ml-service/best_model.pth` (or set `ML_MODEL_PATH`)
-- Copy `ml-service/label_maps.example.json` to `ml-service/label_maps.json` if needed
-
-Run:
-```bash
-uvicorn app:app --reload --port 8000
-```
-
-When running, image upload in the add-item modal calls `POST /api/ml/predict` and pre-fills:
-- `category`
-- `warmthRating`
-- `formalities`
-
-If the model is unavailable, the modal falls back to manual entry.
 
 ## Structure
 - `src/utils/expertSystem.js` — all rule logic
