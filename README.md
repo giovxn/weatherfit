@@ -23,13 +23,13 @@ WeatherFit is a full-stack outfit recommendation system that combines rule-based
 - OpenWeatherMap API
 - PyTorch (ML service)
 
-## Architecture
+## System preview
 
-High-level architecture:
+<img src="docs/screenshots/home.png" alt="WeatherFit home screen" width="400" />
+<img src="docs/screenshots/add-item-ml.png" alt="Add item modal with ML autofill" width="400" />
+<img src="docs/screenshots/recommendation.png" alt="WeatherFit recommendation output" width="400" />
 
-<img src="docs/screenshots/recommendation.png" alt="WeatherFit recommendation output" width="700" />
-
-Core modules:
+## Implementation overview
 
 - `src/utils/expertSystem.js` - rule scoring and recommendation logic
 - `src/components/` - UI flows (auth, add/delete item modals, activity selector)
