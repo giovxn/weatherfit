@@ -2,7 +2,7 @@
 
 WeatherFit is a full-stack outfit recommendation system that combines rule-based decision logic, live weather signals, and ML-assisted wardrobe attribute extraction.
 
-![WeatherFit preview](docs/screenshots/home.png)
+![WeatherFit preview](docs/screenshots/recommendation.png)
 
 [Demo Video](https://youtu.be/IDxKMkDW8mA)
 
