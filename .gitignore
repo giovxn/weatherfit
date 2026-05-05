@@ -31,3 +31,13 @@ ml-service/.venv/
 ml-service/__pycache__/
 ml-service/*.pth
 ml-service/*.pt
+
+# Backend Python
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+
+# Backend Python
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc

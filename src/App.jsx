@@ -7,10 +7,23 @@ import OutfitPreview from './components/OutfitPreview';
 import Modal from './components/Modal';
 import ActivitySelector from './components/ActivitySelector';
 import DeleteItemModal from './components/DeleteItemModal';
-import { saveToIndexedDB, getFromIndexedDB } from './utils/indexedDB';
+import TopNav from './components/TopNav';
+import AuthModal from './components/AuthModal';
 import { runExpertSystem } from './utils/expertSystem';
 import { PRELOAD_WARDROBE } from './utils/preloadData';
 import { predictClothingAttributes } from './utils/mlPredict';
+import {
+  clearStoredToken,
+  createItem,
+  deleteItemById,
+  fetchCurrentUser,
+  fetchItems,
+  getStoredToken,
+  loginUser,
+  loginWithGoogle,
+  registerUser,
+  setStoredToken
+} from './utils/authApi';
 
 const EMPTY_ITEM = {
   category: 'top', name: '', warmthRating: 5,
@@ -18,10 +31,23 @@ const EMPTY_ITEM = {
   image: null
 };
 const PREDICTION_CONFIDENCE_THRESHOLD = 65;
+const EMPTY_CLOTHES = {
+  hat: [], top: [], bottom: [], outerwear: [], shoes: [], accessories: []
+};
+const CITY_STORAGE_KEY = 'weatherfit_selected_city';
+
+const getInitialCity = () => {
+  try {
+    const stored = localStorage.getItem(CITY_STORAGE_KEY);
+    return stored && stored.trim().length > 0 ? stored : 'Dubai';
+  } catch {
+    return 'Dubai';
+  }
+};
 
 const SmartOutfitSelector = () => {
   const [temperature, setTemperature] = useState(null);
-  const [city, setCity] = useState('Dubai');
+  const [city, setCity] = useState(getInitialCity);
   const [loading, setLoading] = useState(false);
   const [weatherData, setWeatherData] = useState(null);
   const [activity, setActivity] = useState('casual');
@@ -29,9 +55,7 @@ const SmartOutfitSelector = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [newItem, setNewItem] = useState(EMPTY_ITEM);
   const [imagePreview, setImagePreview] = useState(null);
-  const [clothes, setClothes] = useState({
-    hat: [], top: [], bottom: [], outerwear: [], shoes: [], accessories: []
-  });
+  const [clothes, setClothes] = useState(EMPTY_CLOTHES);
   const [recommendations, setRecommendations] = useState([]);
   const [selectedOutfit, setSelectedOutfit] = useState(null);
   const [predictionState, setPredictionState] = useState({
@@ -41,9 +65,33 @@ const SmartOutfitSelector = () => {
     confidenceByHead: null,
     needsReview: false
   });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('signin');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [deletingItemIds, setDeletingItemIds] = useState(new Set());
+  const [preloadLoading, setPreloadLoading] = useState(false);
+  const [deletedWhileModalOpen, setDeletedWhileModalOpen] = useState(false);
 
-  useEffect(() => { loadClothes(); }, []);
   useEffect(() => { fetchWeather(); }, [city]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CITY_STORAGE_KEY, city);
+    } catch {
+      // Ignore storage failures; app can still function with in-memory state.
+    }
+  }, [city]);
+  useEffect(() => { bootstrapAuth(); }, []);
+  useEffect(() => {
+    if (currentUser) {
+      loadClothes();
+    } else {
+      setClothes(EMPTY_CLOTHES);
+      setRecommendations([]);
+      setSelectedOutfit(null);
+    }
+  }, [currentUser]);
   useEffect(() => {
     if (temperature !== null && weatherData) generateRecommendations();
   }, [temperature, weatherData, clothes, activity]);
@@ -56,14 +104,73 @@ const SmartOutfitSelector = () => {
     if (recommendations.length > 0) setSelectedOutfit(recommendations[0].outfits[0]);
   }, [recommendations]);
 
+  const mapApiItemToUiItem = (item) => ({
+    id: item.id,
+    category: item.category,
+    name: item.name,
+    warmthRating: item.warmth_rating,
+    weatherProtection: item.weather_protection,
+    formalities: item.formalities || [],
+    image: item.image_url || null
+  });
+
+  const buildItemSignature = (item) => {
+    const formalities = [...(item.formalities || [])]
+      .map((value) => (value || '').toString().trim().toLowerCase())
+      .sort()
+      .join('|');
+
+    return [
+      (item.name || '').toString().trim().toLowerCase(),
+      (item.category || '').toString().trim().toLowerCase(),
+      Number(item.warmthRating ?? 5),
+      (item.weatherProtection || 'none').toString().trim().toLowerCase(),
+      formalities,
+      (item.image || '').toString().trim()
+    ].join('::');
+  };
+
+  const toGroupedClothes = (items) => {
+    const grouped = { ...EMPTY_CLOTHES };
+    const seenByCategory = {
+      hat: new Set(),
+      top: new Set(),
+      bottom: new Set(),
+      outerwear: new Set(),
+      shoes: new Set(),
+      accessories: new Set()
+    };
+
+    items.forEach((item) => {
+      if (!grouped[item.category]) return;
+      const dedupeKey = item.id ?? buildItemSignature(item);
+      if (seenByCategory[item.category].has(dedupeKey)) return;
+      seenByCategory[item.category].add(dedupeKey);
+      grouped[item.category].push(item);
+    });
+    return grouped;
+  };
+
   const loadClothes = async () => {
+    const token = getStoredToken();
+    if (!token) return;
     try {
-      const stored = await getFromIndexedDB('outfitClothes');
-      if (stored) setClothes({
-        hat: [], top: [], bottom: [], outerwear: [], shoes: [], accessories: [],
-        ...stored
-      });
+      const items = await fetchItems(token);
+      const mapped = items.map(mapApiItemToUiItem);
+      setClothes(toGroupedClothes(mapped));
     } catch (e) { console.error(e); }
+  };
+
+  const bootstrapAuth = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+    try {
+      const me = await fetchCurrentUser(token);
+      setCurrentUser(me);
+    } catch (e) {
+      clearStoredToken();
+      setCurrentUser(null);
+    }
   };
 
   const fetchWeather = async () => {
@@ -173,13 +280,29 @@ const SmartOutfitSelector = () => {
 
   const addItemToCloset = async () => {
     if (!newItem.name.trim()) return;
-    const updated = {
-      ...clothes,
-      [newItem.category]: [...(clothes[newItem.category] ?? []), { ...newItem }]
-    };
-    setClothes(updated);
-    try { await saveToIndexedDB('outfitClothes', updated); }
-    catch (e) { console.error(e); }
+    const token = getStoredToken();
+    if (!token) {
+      setAuthMode('signin');
+      setAuthError('');
+      setAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      await createItem(token, {
+        name: newItem.name.trim(),
+        category: newItem.category,
+        warmth_rating: newItem.warmthRating,
+        weather_protection: newItem.weatherProtection,
+        formalities: newItem.formalities || [],
+        image_url: newItem.image || null
+      });
+      await loadClothes();
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+
     setShowAddModal(false);
     setNewItem(EMPTY_ITEM);
     setImagePreview(null);
@@ -193,22 +316,145 @@ const SmartOutfitSelector = () => {
   };
 
   const preloadCloset = async () => {
-    setClothes(PRELOAD_WARDROBE);
-    try { await saveToIndexedDB('outfitClothes', PRELOAD_WARDROBE); }
-    catch (e) { console.error(e); }
+    const token = getStoredToken();
+    if (!token) {
+      setAuthMode('signin');
+      setAuthError('');
+      setAuthModalOpen(true);
+      return;
+    }
+    if (preloadLoading) return;
+
+    setPreloadLoading(true);
+    try {
+      const existingItems = Object.values(clothes).flat();
+      const existingSignatures = new Set(existingItems.map(buildItemSignature));
+      const preloadItems = Object.values(PRELOAD_WARDROBE).flat();
+      for (const item of preloadItems) {
+        const signature = buildItemSignature(item);
+        if (existingSignatures.has(signature)) continue;
+
+        await createItem(token, {
+          name: item.name,
+          category: item.category,
+          warmth_rating: item.warmthRating,
+          weather_protection: item.weatherProtection,
+          formalities: item.formalities || [],
+          image_url: item.image || null
+        });
+        existingSignatures.add(signature);
+      }
+      await loadClothes();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPreloadLoading(false);
+    }
   };
 
-  const deleteItem = async (category, itemName) => {
-    const updated = {
-      ...clothes,
-      [category]: clothes[category].filter(i => i.name !== itemName)
-    };
-    setClothes(updated);
-    try { await saveToIndexedDB('outfitClothes', updated); }
-    catch (e) { console.error(e); }
+  const deleteItem = async (itemId) => {
+    const token = getStoredToken();
+    if (!token) return;
+    if (deletingItemIds.has(itemId)) return;
+
+    setDeletingItemIds((prev) => new Set(prev).add(itemId));
+    try {
+      await deleteItemById(token, itemId);
+      setDeletedWhileModalOpen(true);
+      setClothes((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((category) => {
+          next[category] = next[category].filter((item) => item.id !== itemId);
+        });
+        return next;
+      });
+    } catch (e) {
+      if (!String(e.message || '').includes('404')) {
+        console.error(e);
+      }
+    } finally {
+      setDeletingItemIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
   };
 
   const hasClothes = Object.values(clothes).some(arr => arr.length > 0);
+
+  const resetSessionUiState = () => {
+    setClothes(EMPTY_CLOTHES);
+    setRecommendations([]);
+    setSelectedOutfit(null);
+    setShowAddModal(false);
+    setShowDeleteModal(false);
+    setNewItem(EMPTY_ITEM);
+    setImagePreview(null);
+    setPreloadLoading(false);
+    setDeletingItemIds(new Set());
+    setPredictionState({
+      loading: false,
+      error: '',
+      confidence: null,
+      confidenceByHead: null,
+      needsReview: false
+    });
+  };
+
+  const handleAuthSubmit = async ({ email, password }) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const response = authMode === 'signin'
+        ? await loginUser({ email, password })
+        : await registerUser({ email, password });
+      // Clear previous session artifacts before loading account-specific data.
+      resetSessionUiState();
+      setStoredToken(response.access_token);
+      setCurrentUser(response.user);
+      setAuthModalOpen(false);
+    } catch (error) {
+      setAuthError(error.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    clearStoredToken();
+    setCurrentUser(null);
+    resetSessionUiState();
+    window.location.reload();
+  };
+
+  const handleDeleteModalOpen = () => {
+    setDeletedWhileModalOpen(false);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteModalClose = () => {
+    setShowDeleteModal(false);
+    if (deletedWhileModalOpen) {
+      window.location.reload();
+    }
+  };
+
+  const handleGoogleAuth = async (credential) => {
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const response = await loginWithGoogle(credential);
+      resetSessionUiState();
+      setStoredToken(response.access_token);
+      setCurrentUser(response.user);
+      setAuthModalOpen(false);
+    } catch (error) {
+      setAuthError(error.message || 'Google sign-in failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   return (
     <div
@@ -216,6 +462,15 @@ const SmartOutfitSelector = () => {
       aria-label="WeatherFit application"
     >
       <div style={{ maxWidth: selectedOutfit ? '1000px' : '600px', margin: '0 auto', transition: 'max-width 0.3s ease' }}>
+        <TopNav
+          currentUser={currentUser}
+          onSignOut={handleSignOut}
+          onRequestSignIn={() => {
+            setAuthMode('signin');
+            setAuthError('');
+            setAuthModalOpen(true);
+          }}
+        />
 
         <Header
           city={city} temperature={temperature}
@@ -229,6 +484,7 @@ const SmartOutfitSelector = () => {
           </ActionButton>
           <button
             onClick={preloadCloset}
+            disabled={preloadLoading}
             style={{
               height: '50px',
               padding: '0 16px',
@@ -236,13 +492,15 @@ const SmartOutfitSelector = () => {
               background: 'white',
               border: '1px solid #d2d2d7',
               borderRadius: '12px',
-              cursor: 'pointer',
+              cursor: preloadLoading ? 'default' : 'pointer',
               fontSize: '14px',
               fontWeight: '500',
               color: '#86868b',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              opacity: preloadLoading ? 0.6 : 1
             }}
             onMouseEnter={e => {
+              if (preloadLoading) return;
               e.currentTarget.style.borderColor = '#133f63';
               e.currentTarget.style.color = '#133f63';
             }}
@@ -251,10 +509,10 @@ const SmartOutfitSelector = () => {
               e.currentTarget.style.color = '#86868b';
             }}
           >
-            Preload Closet
+            {preloadLoading ? 'Preloading...' : 'Preload Closet'}
           </button>
           <button
-            onClick={() => setShowDeleteModal(true)}
+            onClick={handleDeleteModalOpen}
             style={{
               width: '50px',
               height: '50px',
@@ -338,9 +596,24 @@ const SmartOutfitSelector = () => {
 
       <DeleteItemModal
         show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={handleDeleteModalClose}
         clothes={clothes}
         onDelete={deleteItem}
+        deletingItemIds={deletingItemIds}
+      />
+
+      <AuthModal
+        show={authModalOpen}
+        mode={authMode}
+        setMode={setAuthMode}
+        loading={authLoading}
+        error={authError}
+        onSubmit={handleAuthSubmit}
+        onGoogleCredential={handleGoogleAuth}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setAuthError('');
+        }}
       />
     </div>
   );

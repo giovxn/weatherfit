@@ -11,7 +11,7 @@ const categoryEmoji = (cat) => {
   return map[cat] || '👔';
 };
 
-const DeleteItemModal = ({ show, onClose, clothes, onDelete }) => {
+const DeleteItemModal = ({ show, onClose, clothes, onDelete, deletingItemIds = new Set() }) => {
   if (!show) return null;
 
   const allCategories = Object.entries(clothes).filter(([, items]) => items.length > 0);
@@ -51,7 +51,7 @@ const DeleteItemModal = ({ show, onClose, clothes, onDelete }) => {
                 {CATEGORY_LABELS[category]}
               </div>
               {items.map((item, i) => (
-                <div key={i} style={{
+                <div key={`${category}-${item.id ?? 'no-id'}-${i}`} style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '10px 0',
                   borderBottom: i < items.length - 1 ? '1px solid #f0f0f0' : 'none'
@@ -72,11 +72,14 @@ const DeleteItemModal = ({ show, onClose, clothes, onDelete }) => {
                     {item.name}
                   </span>
                   <button
-                    onClick={() => onDelete(category, item.name)}
+                    type="button"
+                    disabled={deletingItemIds.has(item.id)}
+                    onClick={() => onDelete(item.id)}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       color: '#d2d2d7', padding: '4px', borderRadius: '6px',
-                      display: 'flex', alignItems: 'center', transition: 'color 0.15s'
+                      display: 'flex', alignItems: 'center', transition: 'color 0.15s',
+                      opacity: deletingItemIds.has(item.id) ? 0.4 : 1
                     }}
                     onMouseEnter={e => e.currentTarget.style.color = '#ff3b30'}
                     onMouseLeave={e => e.currentTarget.style.color = '#d2d2d7'}
