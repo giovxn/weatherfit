@@ -4,7 +4,7 @@ WeatherFit is a full-stack outfit recommendation system that combines rule-based
 
 ![WeatherFit preview](docs/screenshots/recommendation.png)
 
-[Demo Video](https://youtu.be/IDxKMkDW8mA)
+[Demo Video](https://www.youtube.com/watch?v=gc6y_KwtZJg)
 
 ## What it does
 
