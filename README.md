@@ -123,6 +123,18 @@ Items endpoints:
 - `POST /api/items`
 - `DELETE /api/items/{item_id}`
 
+## Quality and testing
+
+- Manual reliability test plan: `docs/testing/test-plan.md`
+- Latest reliability run report: `docs/testing/reliability-report-2026-05-06.md`
+- Test evidence screenshots: `docs/screenshots/`
+- Known issue: repeated preload can still create duplicate wardrobe entries (tracked in latest reliability report)
+
+## Deployment status
+
+- Live app: `coming soon`
+- API health endpoint: `coming soon`
+
 ## Current limitations
 
 - Recommendation quality depends on item metadata quality (manual or ML-filled)
